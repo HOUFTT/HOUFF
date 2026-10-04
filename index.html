@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HOFTT Bank</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+body{margin:0 auto;background:#0F172A;color:#fff;font-family:system-ui,-apple-system,sans-serif;padding:20px;max-width:420px}
+h1{text-align:center;color:#C89A5A}
+.card{background:#1a233a;border:1px solid #C89A5A;border-radius:16px;padding:16px;margin:12px 0}
+input,button{width:100%;padding:12px;margin:5px 0;border-radius:8px;border:0;font-size:1rem;box-sizing:border-box}
+button{background:#C89A5A;color:#1a1205;font-weight:700}
+button.alt{background:transparent;color:#fff;border:1px solid #C89A5A}
+.mute{color:#9aa6bd;font-size:.88rem}
+.msg{min-height:1.3em;font-size:.92rem;margin:4px 0}
+.err{color:#e5776b}.ok{color:#7fd1a0}
+.big{font-size:2rem;font-weight:700;margin:4px 0}
+.hide{display:none}
+</style></head><body>
+<h1>HOFTT Bank</h1>
+<div id="auth" class="card">
+  <b id="title">Create your account</b>
+  <input id="email" type="email" autocomplete="email" placeholder="Email address">
+  <input id="pw" type="password" placeholder="Password (at least 8 characters)">
+  <button id="go">Sign up</button>
+  <button id="swap" class="alt">I already have an account</button>
+  <div id="msg" class="msg"></div>
+</div>
+<div id="home" class="hide">
+  <div class="card">
+    <div class="mute">Your wallet balance</div>
+    <div class="big" id="bal">R0.00</div>
+    <div class="mute" id="status"></div>
+  </div>
+  <div class="card mute">Deposits and withdrawals will be available once your identity has been verified.</div>
+  <button id="out" class="alt">Sign out</button>
+</div>
+<script>
+const SUPABASE_URL = "https://omzgdqxfvrshtoggjdcx.supabase.co";
+const SUPABASE_KEY = "sb_publishable_edX8AkPpcwl1dJEJsyIduw_DcGLR0kW";
+const $ = id => document.getElementById(id);
+const R = c => "R" + (Number(c) / 100).toFixed(2);
+let mode = "signup";
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+function say(t, ok){ $("msg").className = "msg " + (ok ? "ok" : "err"); $("msg").textContent = t; }
+function setMode(m){
+  mode = m;
+  $("title").textContent = m === "signup" ? "Create your account" : "Sign in";
+  $("go").textContent = m === "signup" ? "Sign up" : "Sign in";
+  $("swap").textContent = m === "signup" ? "I already have an account" : "Create a new account";
+  say("");
+}
+$("swap").onclick = () => setMode(mode === "signup" ? "signin" : "signup");
+$("go").onclick = async () => {
+  const email = $("email").value.trim(), password = $("pw").value;
+  if (!/^\S+@\S+\.\S+$/.test(email)) return say("Enter a valid email address.");
+  if (password.length < 8) return say("Password must be at least 8 characters.");
+  $("go").disabled = true;
+  try {
+    if (mode === "signup") {
+      const { data, error } = await db.auth.signUp({ email, password });
+      if (error) return say(error.message);
+      if (!data.session) { setMode("signin"); say("Account created. Check your email, tap the confirmation link, then sign in.", true); }
+    } else {
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) return say(/invalid login/i.test(error.message) ? "Email or password is incorrect." : error.message);
+    }
+  } catch (e) {
+    say("Could not reach the server. Check your connection and try again.");
+  } finally { $("go").disabled = false; }
+};
+$("out").onclick = () => db.auth.signOut();
+async function showHome(){
+  $("auth").classList.add("hide"); $("home").classList.remove("hide");
+  const w = await db.from("wallet_balances").select("balance_cents").maybeSingle();
+  $("bal").textContent = w.data ? R(w.data.balance_cents) : "R0.00";
+  const u = await db.from("users").select("status").maybeSingle();
+  const s = u.data ? u.data.status : "pending";
+  $("status").textContent = s === "verified" ? "Identity verified" : "Identity verification pending";
+}
+db.auth.onAuthStateChange((_e, session) => {
+  if (session) { showHome(); }
+  else { $("home").classList.add("hide"); $("auth").classList.remove("hide"); $("pw").value = ""; }
+});
+</script></body></html>

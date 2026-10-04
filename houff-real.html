@@ -1,0 +1,13 @@
+<script src="https://js.paystack.co/v1/inline.js"></script>
+<button onclick="pay()">Deposit R1000 REAL</button>
+<script>
+function pay(){
+ PaystackPop.setup({
+  key:'pk_test_234063c6502ecb0c2a4836f1a5823b1ea830bc67',
+  email:'tshepho@houffbank.com',
+  amount:100000,
+  currency:'ZAR',
+  callback:function(r){alert('SUCCESS Ref:'+r.reference)}
+ }).openIframe();
+}
+</script>
